@@ -280,7 +280,26 @@ Bot sinyallerini bu chat'e gönderecek!
    */
   async initialize(): Promise<void> {
     try {
-      await this.bot.launch();
+      // Stop any existing polling
+      try {
+        await this.bot.stop();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+      } catch (e) {
+        // Ignore if not running
+      }
+
+      // Launch bot with webhook mode (better for Railway)
+      // If webhook URL is provided in env, use it; otherwise use polling
+      const webhookUrl = process.env.WEBHOOK_URL;
+      if (webhookUrl) {
+        console.log('🔗 Bot webhook mode ile başlatılıyor...');
+        await this.bot.telegram.setWebhook(webhookUrl);
+        await this.bot.launch({ webhook: { domain: webhookUrl, port: 3000 } });
+      } else {
+        console.log('📡 Bot polling mode ile başlatılıyor...');
+        await this.bot.launch({ polling: { timeout: 30, allowed_updates: ['message', 'callback_query'] } });
+      }
+
       await this.bot.telegram.getMe();
       this.isConnected = true;
       console.log('✅ Telegram bot bağlı ve hazır!');
