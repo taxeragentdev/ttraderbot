@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, TelegramError } from 'telegraf';
 import { TradeSignal } from './types.js';
 
 export interface BotStats {
@@ -297,7 +297,9 @@ Bot sinyallerini bu chat'e gönderecek!
         await this.bot.launch({ webhook: { domain: webhookUrl, port: 3000 } });
       } else {
         console.log('📡 Bot polling mode ile başlatılıyor...');
-        await this.bot.launch({ polling: { timeout: 30, allowed_updates: ['message', 'callback_query'] } });
+        await this.bot.launch({
+          allowedUpdates: ['message', 'callback_query'],
+        });
       }
 
       await this.bot.telegram.getMe();
@@ -306,6 +308,13 @@ Bot sinyallerini bu chat'e gönderecek!
       console.log('📲 Telegram bot aktif - Komutlar hazır');
     } catch (error) {
       console.error('❌ Telegram bot bağlanması başarısız:', error);
+      if (error instanceof TelegramError && error.code === 401) {
+        console.error(`
+TELEGRAM 401 Unauthorized — bot token geçersiz veya yanlış.
+• Railway / hosting: TELEGRAM_BOT_TOKEN değişkenini kontrol et (BotFather’daki token ile birebir aynı olmalı).
+• Boşluk, tırnak veya satır sonu kopyalanmamış olmalı; gerekirse tokeni yenile (/revoke) ve yenisini yapıştır.
+• Değişken adı tam olarak TELEGRAM_BOT_TOKEN olmalı.`);
+      }
       throw error;
     }
   }

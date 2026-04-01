@@ -5,8 +5,8 @@ import { BotConfig } from './types.js';
 dotenv.config();
 
 const DEFAULT_CONFIG: BotConfig = {
-  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
-  telegramChatId: process.env.TELEGRAM_CHAT_ID || '',
+  telegramBotToken: (process.env.TELEGRAM_BOT_TOKEN || '').trim(),
+  telegramChatId: (process.env.TELEGRAM_CHAT_ID || '').trim(),
   hyperliquidApiUrl: process.env.HYPERLIQUID_API_URL || 'https://api.hyperliquid.xyz',
   symbols: (process.env.TRADING_SYMBOLS || 'BTC,ETH').split(','),
   timeframe: (process.env.TIMEFRAME as any) || '5m',
