@@ -1,6 +1,30 @@
 import { Telegraf, TelegramError } from 'telegraf';
 import { TradeSignal } from './types.js';
 
+/** launch() içinde setWebhook zaten çağrılır; ayrıca setWebhook yapma (429 riski). */
+async function launchWith429Retry(bot: Telegraf, config: Parameters<Telegraf['launch']>[0]): Promise<void> {
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await bot.launch(config);
+      return;
+    } catch (e) {
+      if (e instanceof TelegramError && e.code === 429 && attempt < maxAttempts) {
+        const sec = e.parameters?.retry_after ?? 2;
+        console.warn(`Telegram 429 (çok istek) — ${sec}s bekleniyor (${attempt}/${maxAttempts})`);
+        try {
+          await bot.stop();
+        } catch {
+          /* henüz dinleyici yoksa */
+        }
+        await new Promise((r) => setTimeout(r, sec * 1000));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 export interface BotStats {
   isRunning: boolean;
   totalSignals: number;
@@ -288,16 +312,18 @@ Bot sinyallerini bu chat'e gönderecek!
         // Ignore if not running
       }
 
-      // Launch bot with webhook mode (better for Railway)
-      // If webhook URL is provided in env, use it; otherwise use polling
-      const webhookUrl = process.env.WEBHOOK_URL;
+      // Webhook: sadece bot.launch() — içinde setWebhook var; ekstra setWebhook 429 üretir.
+      const webhookUrl = process.env.WEBHOOK_URL?.trim();
+      const listenPort = parseInt(process.env.PORT || process.env.WEBHOOK_PORT || '3000', 10);
       if (webhookUrl) {
         console.log('🔗 Bot webhook mode ile başlatılıyor...');
-        await this.bot.telegram.setWebhook(webhookUrl);
-        await this.bot.launch({ webhook: { domain: webhookUrl, port: 3000 } });
+        await launchWith429Retry(this.bot, {
+          webhook: { domain: webhookUrl, port: listenPort },
+          allowedUpdates: ['message', 'callback_query'],
+        });
       } else {
         console.log('📡 Bot polling mode ile başlatılıyor...');
-        await this.bot.launch({
+        await launchWith429Retry(this.bot, {
           allowedUpdates: ['message', 'callback_query'],
         });
       }
@@ -314,6 +340,11 @@ TELEGRAM 401 Unauthorized — bot token geçersiz veya yanlış.
 • Railway / hosting: TELEGRAM_BOT_TOKEN değişkenini kontrol et (BotFather’daki token ile birebir aynı olmalı).
 • Boşluk, tırnak veya satır sonu kopyalanmamış olmalı; gerekirse tokeni yenile (/revoke) ve yenisini yapıştır.
 • Değişken adı tam olarak TELEGRAM_BOT_TOKEN olmalı.`);
+      }
+      if (error instanceof TelegramError && error.code === 429) {
+        console.error(
+          'TELEGRAM 429: Çok sık setWebhook/getMe. Çift setWebhook kaldırıldı; hâlâ olursa deploy yeniden denemelerini seyrelt veya 1-2 dk bekle.'
+        );
       }
       throw error;
     }
