@@ -25,11 +25,29 @@ export class HyperliquidClient {
     limit: number = 100
   ): Promise<Candle[]> {
     try {
+      // interval: 1m, 5m, 15m, 1h, 4h, 1d
+      const intervalMap: Record<number, string> = {
+        60: '1m',
+        180: '3m',
+        300: '5m',
+        900: '15m',
+        1800: '30m',
+        3600: '1h',
+        7200: '2h',
+        14400: '4h',
+        28800: '8h',
+        43200: '12h',
+        86400: '1d',
+        259200: '3d',
+        604800: '1w',
+      };
+      const intervalStr = intervalMap[interval] || '5m';
+
       const response = await this.axiosInstance.post('/info', {
         type: 'candleSnapshot',
         req: {
           coin: symbol,
-          interval: interval * 1000, // convert to milliseconds
+          interval: intervalStr,
           startTime: Date.now() - limit * interval * 1000,
           endTime: Date.now(),
         },

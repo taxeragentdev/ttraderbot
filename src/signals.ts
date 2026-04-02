@@ -180,8 +180,33 @@ export class SignalEvaluator {
 
     const totalSignals = buySignalCount + sellSignalCount;
     if (totalSignals > 0) {
-      strength = Math.min(100, (Math.max(buySignalCount, sellSignalCount) / totalSignals) * 100);
-      confidence = Math.min(100, totalSignals * 10);
+      // Strength: dominant tarafın oranı
+      const dominantCount = Math.max(buySignalCount, sellSignalCount);
+      const weakCount = Math.min(buySignalCount, sellSignalCount);
+      
+      // Güç = dominant / total, ama zıt sinyaller varsa düşür
+      strength = Math.min(100, (dominantCount / (totalSignals + 1)) * 100);
+      
+      // Confidence: hem toplam sinyal sayısına hem de dominant/weak oranına bağlı
+      // Base: totalSignals * 8 (12.5 sinyal → 100%)
+      // Multiplier: dominant/weak ratio (tek taraflı sinyal → yüksek güven)
+      const baseConfidence = Math.min(80, totalSignals * 8);
+      const ratioMultiplier = weakCount === 0 ? 1.25 : Math.min(1.25, dominantCount / Math.max(weakCount, 0.5));
+      confidence = baseConfidence * ratioMultiplier;
+      
+      // ADX güçlü trend varsa güveni artır
+      if (indicators.adx > 25) {
+        confidence *= 1.15;
+      } else if (indicators.adx < 15) {
+        confidence *= 0.9; // zayıf trend
+      }
+      
+      // Volatilite çok yüksekse güveni azalt
+      if (isVolatile) {
+        confidence *= 0.85;
+      }
+      
+      confidence = Math.min(100, confidence);
 
       if (buySignalCount > sellSignalCount * 1.5) {
         signal = 'BUY';
