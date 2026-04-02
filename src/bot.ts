@@ -117,8 +117,13 @@ export class TradingBot {
       }
 
       const lastSignal = this.lastSignals.get(symbol);
+      // Aynı symbol için aynı tip sinyali 15 dakika içinde tekrar gönderme
       if (lastSignal && lastSignal.type === signal.type) {
-        return;
+        const timeSinceLastSignal = Date.now() - (this.signalHistory.find(h => h.signal.symbol === symbol && h.signal.type === signal.type)?.timestamp || 0);
+        if (timeSinceLastSignal < 900000) { // 15 dakika = 900000ms
+          console.log(`⏭️  ${symbol} ${signal.type} sinyali son 15dk içinde gönderildi, atlanıyor`);
+          return;
+        }
       }
 
       await this.telegramBot.sendSignalNotification(signal);

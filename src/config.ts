@@ -10,7 +10,7 @@ const DEFAULT_CONFIG: BotConfig = {
   hyperliquidApiUrl: process.env.HYPERLIQUID_API_URL || 'https://api.hyperliquid.xyz',
   symbols: (process.env.TRADING_SYMBOLS || 'BTC,ETH').split(','),
   timeframe: (process.env.TIMEFRAME as any) || '5m',
-  updateInterval: parseInt(process.env.UPDATE_INTERVAL || '300000', 10), // 5 minutes
+  updateInterval: parseInt(process.env.UPDATE_INTERVAL || '60000', 10), // 1 minute default
   riskManagement: {
     maxPositionSize: parseFloat(process.env.MAX_POSITION_SIZE || '0.1'),
     maxLossPct: parseFloat(process.env.MAX_LOSS_PCT || '2'),
@@ -19,7 +19,7 @@ const DEFAULT_CONFIG: BotConfig = {
   },
   signalSettings: {
     minStrength: parseFloat(process.env.MIN_SIGNAL_STRENGTH || '60'),
-    minConfidence: parseFloat(process.env.MIN_SIGNAL_CONFIDENCE || '50'),
+    minConfidence: parseFloat(process.env.MIN_SIGNAL_CONFIDENCE || '35'),
     enableBuySignals: process.env.ENABLE_BUY_SIGNALS !== 'false',
     enableSellSignals: process.env.ENABLE_SELL_SIGNALS !== 'false',
   },
