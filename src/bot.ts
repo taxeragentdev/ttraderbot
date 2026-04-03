@@ -10,7 +10,10 @@ export class TradingBot {
   private hyperliquidClient: HyperliquidClient;
   private telegramBot: TelegramBot;
   private isRunning: boolean = false;
-  private lastSignals: Map<string, TradeSignal> = new Map();
+  // symbol+type → son gönderilme zamanı (örn: "BTC-BUY" → 1234567890)
+  private lastSignalTime: Map<string, number> = new Map();
+  // symbol → analiz yapılıyor mu? (paralel analiz önleme)
+  private analyzingSymbols: Set<string> = new Set();
   private signalHistory: {
     timestamp: number;
     signal: TradeSignal;
@@ -85,6 +88,14 @@ export class TradingBot {
   }
 
   private async analyzeSymbol(symbol: string): Promise<void> {
+    // Bu symbol zaten analiz ediliyorsa atla (paralel analiz önleme)
+    if (this.analyzingSymbols.has(symbol)) {
+      console.log(`⏭️  ${symbol} zaten analiz ediliyor, atlanıyor`);
+      return;
+    }
+
+    this.analyzingSymbols.add(symbol);
+    
     try {
       const interval = this.getIntervalSeconds(this.config.timeframe);
       const marketData = await this.hyperliquidClient.getMarketData(symbol, interval, 200);
@@ -116,21 +127,30 @@ export class TradingBot {
         return;
       }
 
-      const lastSignal = this.lastSignals.get(symbol);
-      // Aynı symbol için aynı tip sinyali 15 dakika içinde tekrar gönderme
-      if (lastSignal && lastSignal.type === signal.type) {
-        const timeSinceLastSignal = Date.now() - (this.signalHistory.find(h => h.signal.symbol === symbol && h.signal.type === signal.type)?.timestamp || 0);
+      // Aynı symbol+type için son 15 dakika içinde sinyal gönderilmiş mi?
+      const signalKey = `${symbol}-${signal.type}`;
+      const lastTime = this.lastSignalTime.get(signalKey);
+      const now = Date.now();
+      
+      if (lastTime) {
+        const timeSinceLastSignal = now - lastTime;
+        const minutesSince = Math.floor(timeSinceLastSignal / 60000);
+        
         if (timeSinceLastSignal < 900000) { // 15 dakika = 900000ms
-          console.log(`⏭️  ${symbol} ${signal.type} sinyali son 15dk içinde gönderildi, atlanıyor`);
+          console.log(`⏭️  ${symbol} ${signal.type} sinyali ${minutesSince} dakika önce gönderildi, atlanıyor (min: 15dk)`);
           return;
         }
       }
 
+      // Sinyal gönder
       await this.telegramBot.sendSignalNotification(signal);
-
-      this.lastSignals.set(symbol, signal);
+      
+      // Son gönderim zamanını kaydet
+      this.lastSignalTime.set(signalKey, now);
+      
+      // Geçmişe ekle
       this.signalHistory.push({
-        timestamp: Date.now(),
+        timestamp: now,
         signal,
       });
 
@@ -141,6 +161,9 @@ export class TradingBot {
       console.log(`📊 ${symbol} için sinyal: ${signal.type} (${signal.strength.toFixed(0)}%)`);
     } catch (error) {
       console.error(`❌ ${symbol} analiz hatası:`, error);
+    } finally {
+      // Analiz bitti, kilidi kaldır
+      this.analyzingSymbols.delete(symbol);
     }
   }
 
